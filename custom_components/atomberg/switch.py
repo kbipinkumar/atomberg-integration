@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import AtombergDataUpdateCoordinator
-from .device import ATTR_SLEEP, AtombergDevice
+from .device import ATTR_IDLE_SLEEP, ATTR_SLEEP, AtombergDevice
 from .entity import AtombergEntity, platform_async_setup_entry
 
 _LOGGER = getLogger(__name__)
@@ -23,7 +23,13 @@ async def async_setup_entry(
 ) -> None:
     """Automatically setup the switch entities from the devices list."""
     await platform_async_setup_entry(
-        hass, entry, async_add_entities, AtombergSleepModeSwitchEntity
+        hass, entry, async_add_entities, AtombergSleepModeSwitchEntity,
+        filter_func=lambda d: d.series != "W2"
+    )
+
+    await platform_async_setup_entry(
+        hass, entry, async_add_entities, AtombergPurifierIdleSleepSwitchEntity,
+        filter_func=lambda d: d.series == "W2"
     )
 
 
@@ -43,7 +49,7 @@ class AtombergSleepModeSwitchEntity(AtombergEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Whether the fan sleep mode is on."""
-        return self.device_state[ATTR_SLEEP]
+        return self.device_state.get(ATTR_SLEEP, False)
 
     @property
     def icon(self) -> str | None:
@@ -53,7 +59,39 @@ class AtombergSleepModeSwitchEntity(AtombergEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on entity."""
         await self._device.async_turn_on_sleep_mode()
+        self.update_ha_state_if_required()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off entity."""
         await self._device.async_turn_off_sleep_mode()
+        self.update_ha_state_if_required()
+
+
+class AtombergPurifierIdleSleepSwitchEntity(AtombergEntity, SwitchEntity):
+    """Idle sleep switch entity for Atomberg Water Purifier."""
+
+    def __init__(
+        self, coordinator: AtombergDataUpdateCoordinator, device: AtombergDevice
+    ) -> None:
+        """Init idle sleep switch entity."""
+        super().__init__(coordinator, device, _LOGGER)
+
+        self._attr_name = self._device.name + " idle sleep"
+        self._attr_unique_id = self._get_unique_id(Platform.SWITCH, ATTR_IDLE_SLEEP)
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_icon = "mdi:power-sleep"
+
+    @property
+    def is_on(self) -> bool:
+        """Whether idle sleep is on."""
+        return bool(self.device_state.get(ATTR_IDLE_SLEEP, 0))
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on entity."""
+        await self._device.async_set_purifier_idle_sleep(True)
+        self.update_ha_state_if_required()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off entity."""
+        await self._device.async_set_purifier_idle_sleep(False)
+        self.update_ha_state_if_required()

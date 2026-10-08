@@ -1,5 +1,6 @@
 """Base Atomberg entity."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from logging import Logger
 from typing import TypeVar
@@ -35,6 +36,8 @@ from .device import (
 
 AVAILABILITY_TIMEOUT = 10  # Seconds
 
+
+
 _EntityT = TypeVar("_EntityT", bound="AtombergEntity")
 
 
@@ -42,7 +45,8 @@ async def platform_async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    entity_type: _EntityT,
+    entity_type: type[_EntityT],
+    filter_func: Callable[[AtombergDevice], bool] | None = None,
 ) -> None:
     """Set up an Atomberg platform."""
     coordinator: AtombergDataUpdateCoordinator = hass.data[DOMAIN][ENTRIES][
@@ -51,6 +55,7 @@ async def platform_async_setup_entry(
     async_add_entities(
         entity_type(coordinator=coordinator, device=device)
         for device in coordinator.devices
+        if filter_func is None or filter_func(device)
     )
 
 
@@ -101,12 +106,20 @@ class AtombergEntity(CoordinatorEntity, Entity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        if self.coordinator.data["device_id"] != self._device.id:
+        data = self.coordinator.data
+        if not data:
+            return
+
+        if data.get("polled"):
+            self.update_ha_state_if_required()
+            return
+
+        if data.get("device_id") != self._device.id:
             return
 
         state = {}
         # Decode the state data
-        if state_string := self.coordinator.data.get("state_string"):
+        if state_string := data.get("state_string"):
             value = state_string.split(",")[0].strip()
             if not value.isnumeric():
                 return
@@ -142,7 +155,7 @@ class AtombergEntity(CoordinatorEntity, Entity):
                 state[ATTR_LIGHT_MODE] = light_mode
 
         self._device.update_state({**state, ATTR_IS_ONLINE: True})
-        self._device.update_ip_address(self.coordinator.data.get("ip_address"))
+        self._device.update_ip_address(data.get("ip_address"))
         self._device.update_last_seen(utcnow().timestamp())
         self.update_ha_state_if_required()
 
@@ -156,6 +169,8 @@ class AtombergEntity(CoordinatorEntity, Entity):
     def _refresh_availability(self, now: datetime):
         """Update is_online state based on last_seen."""
         if self._device.last_seen and self.available:
+            timeout = 7200 if self._device.series == "W2" else AVAILABILITY_TIMEOUT
+
             self._logger.debug(
                 "Refreshing availability of %s (%s) - (%s)",
                 self._device.name,
@@ -165,7 +180,7 @@ class AtombergEntity(CoordinatorEntity, Entity):
             self._device.update_state(
                 {
                     ATTR_IS_ONLINE: now.timestamp() - self._device.last_seen
-                    <= AVAILABILITY_TIMEOUT
+                    <= timeout
                 }
             )
             self.update_ha_state_if_required()

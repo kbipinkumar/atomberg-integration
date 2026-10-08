@@ -34,7 +34,13 @@ async def async_setup_entry(
         await ir_fan_async_setup_entry(hass, entry, async_add_entities)
         return
 
-    await platform_async_setup_entry(hass, entry, async_add_entities, AtombergFanEntity)
+    await platform_async_setup_entry(
+        hass,
+        entry,
+        async_add_entities,
+        AtombergFanEntity,
+        filter_func=lambda d: d.series != "W2"
+    )
 
 
 class AtombergFanEntity(AtombergEntity, FanEntity):
@@ -85,11 +91,14 @@ class AtombergFanEntity(AtombergEntity, FanEntity):
                     ORDERED_FAN_SPEEDS, percentage=percentage
                 )
             )
+        self.update_ha_state_if_required()
 
     async def async_turn_on(self, *args, **kwargs: Any) -> None:
         """Turn on the entity."""
         await self._device.async_turn_on()
+        self.update_ha_state_if_required()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the entity."""
         await self._device.async_turn_off()
+        self.update_ha_state_if_required()

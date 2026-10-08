@@ -29,6 +29,7 @@ SUPPORTED_SERIES = [
     "M2",
     "S1",
     "S2",
+    "W2",
 ]
 
 
@@ -178,11 +179,13 @@ class AtombergCloudAPI:
                 # Keep is_online=False unless it's presense detected through udp broadcasts
                 state["is_online"] = False
                 # Rename some keys for ease of access
-                state["speed"] = state.pop("last_recorded_speed")
-                state["sleep"] = state.pop("sleep_mode")
-                if state.get("last_recorded_brightness"):
+                if "last_recorded_speed" in state:
+                    state["speed"] = state.pop("last_recorded_speed")
+                if "sleep_mode" in state and isinstance(state["sleep_mode"], bool):
+                    state["sleep"] = state.pop("sleep_mode")
+                if "last_recorded_brightness" in state:
                     state["brightness"] = state.pop("last_recorded_brightness")
-                if state.get("last_recorded_color"):
+                if "last_recorded_color" in state:
                     state["light_mode"] = state.pop("last_recorded_color")
                 device_state.append(state)
 

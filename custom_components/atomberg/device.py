@@ -27,6 +27,16 @@ ATTR_LIGHT_MODE = "light_mode"
 ATTR_LED = "led"
 ATTR_TIMER_HOURS = "timer_hours"
 ATTR_TIMER_TIME_ELAPSED_MINS = "timer_time_elapsed_mins"
+
+# Purifier constants
+ATTR_MODE = "mode"
+ATTR_FALLBACK_MODE = "fallback_mode"
+ATTR_IDLE_SLEEP = "idle_sleep"
+ATTR_TDS_THRESHOLD = "tds_threshold"
+ATTR_INPUT_TDS = "input_tds"
+ATTR_TANK_TDS = "tank_tds"
+ATTR_CHOKING_FAULTS = "choking_faults"
+ATTR_SYSTEM_FAULTS = "system_faults"
 LIGHT_MODE_DAYLIGHT = "daylight"
 LIGHT_MODE_COOL = "cool"
 LIGHT_MODE_WARM = "warm"
@@ -219,6 +229,31 @@ class AtombergDevice:
         if await self._api.async_send_command(self.id, {"timer": value}):
             _LOGGER.debug("%s: set sleep mode: %d", self.name, value)
             self.update_state({ATTR_TIMER_HOURS: TIMER_MAPPING[value][0]})
+
+    async def async_set_purifier_mode(self, mode: int):
+        """Set purifier mode."""
+        cmd = {ATTR_MODE: mode}
+        if await self._async_send_command(cmd):
+            self.update_state(cmd)
+
+    async def async_set_purifier_fallback_mode(self, mode: int):
+        """Set purifier fallback mode."""
+        cmd = {ATTR_FALLBACK_MODE: mode}
+        if await self._async_send_command(cmd):
+            self.update_state(cmd)
+
+    async def async_set_purifier_idle_sleep(self, enable: bool):
+        """Set purifier idle sleep."""
+        val = 1 if enable else 0
+        cmd = {ATTR_IDLE_SLEEP: val}
+        if await self._async_send_command(cmd):
+            self.update_state(cmd)
+
+    async def async_set_purifier_tds_threshold(self, tds: int):
+        """Set purifier tds threshold."""
+        cmd = {ATTR_TDS_THRESHOLD: tds}
+        if await self._async_send_command(cmd):
+            self.update_state(cmd)
 
     def update_state(self, new_state: dict):
         """Update states."""
